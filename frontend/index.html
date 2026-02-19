@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanPass — Visual Authentication</title>
+    <meta name="description"
+        content="ScanPass: Dynamic visual-based secondary authentication using live video and AI embeddings.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header class="app-header">
+        <div class="logo">
+            <span class="logo-icon">🔐</span>
+            <h1>Scan<span class="accent">Pass</span></h1>
+        </div>
+        <p class="tagline">Dynamic Visual Authentication</p>
+        <button id="logoutBtn" class="btn-logout" onclick="logout()" style="display:none">Sign Out</button>
+    </header>
+
+    <!-- ===== VIEW: LOGIN ===== -->
+    <section id="view-login" class="view active">
+        <div class="card glass">
+            <div class="card-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to start visual authentication</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" placeholder="Enter your username" required
+                        autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required
+                        autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    <span>Sign In</span>
+                </button>
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+                <button type="button" class="btn-secondary visual-login-btn" onclick="handleVisualLoginClick()">
+                    <span class="icon">👁️</span>
+                    <span>Login with Visual Key</span>
+                </button>
+            </form>
+            <div class="card-footer">
+                <p>Don't have an account? <a href="#" onclick="showView('view-register')">Register</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== VIEW: REGISTER ===== -->
+    <section id="view-register" class="view">
+        <div class="card glass">
+            <div class="card-header">
+                <h2>Create Account</h2>
+                <p>Set up your ScanPass credentials</p>
+            </div>
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <div class="input-group">
+                    <label for="regUsername">Username</label>
+                    <input type="text" id="regUsername" placeholder="Choose a username (3+ chars)" required
+                        minlength="3" autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="regPassword">Password</label>
+                    <input type="password" id="regPassword" placeholder="Choose a password (4+ chars)" required
+                        minlength="4" autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn-primary" id="registerBtn">
+                    <span>Create Account</span>
+                </button>
+                <div class="divider">
+                    <span>OR</span>
+                </div>
+                <button type="button" class="btn-secondary visual-login-btn" onclick="handleVisualRegisterClick()">
+                    <span class="icon">👁️</span>
+                    <span>Register with Visual Key</span>
+                </button>
+            </form>
+            <div class="card-footer">
+                <p>Already have an account? <a href="#" onclick="showView('view-login')">Sign In</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== VIEW: OBJECT ENROLLMENT ===== -->
+    <section id="view-enroll" class="view">
+        <div class="card glass wide-card">
+            <div class="card-header">
+                <h2>🔑 Enroll Your Visual Key</h2>
+                <p>Choose a personal object (mug, pen, keychain, etc.) and record a short video</p>
+            </div>
+            <div class="camera-container">
+                <video id="enrollVideo" autoplay playsinline muted></video>
+                <div class="camera-overlay" id="enrollOverlay">
+                    <div class="scan-ring"></div>
+                    <span>Position your object in view</span>
+                </div>
+                <div class="recording-indicator" id="enrollRecordingIndicator" style="display:none">
+                    <span class="rec-dot"></span> Recording...
+                </div>
+            </div>
+            <div class="camera-controls">
+                <button class="btn-record" id="enrollRecordBtn" onclick="startEnrollment()">
+                    <span class="record-circle"></span>
+                    <span>Record Object (3 seconds)</span>
+                </button>
+            </div>
+            <div class="progress-bar" id="enrollProgress" style="display:none">
+                <div class="progress-fill" id="enrollProgressFill"></div>
+            </div>
+            <div id="enrollStatus" class="status-message"></div>
+        </div>
+    </section>
+
+    <!-- ===== VIEW: AUTHENTICATION ===== -->
+    <section id="view-auth" class="view">
+        <div class="card glass wide-card">
+            <div class="card-header">
+                <h2>🛡️ Visual Authentication</h2>
+                <p>Step 2: Verify your identity with your visual key</p>
+            </div>
+
+            <!-- Challenge Display -->
+            <div class="challenge-box" id="challengeBox">
+                <div class="challenge-label">YOUR CHALLENGE</div>
+                <div class="challenge-text" id="challengeText">Loading challenge...</div>
+                <div class="challenge-hint" id="challengeHint">Follow the instruction while recording</div>
+            </div>
+
+            <div class="camera-container">
+                <video id="authVideo" autoplay playsinline muted></video>
+                <div class="camera-overlay" id="authOverlay">
+                    <div class="scan-ring auth-ring"></div>
+                    <span>Hold your object and follow the challenge</span>
+                </div>
+                <div class="recording-indicator" id="authRecordingIndicator" style="display:none">
+                    <span class="rec-dot"></span> Recording...
+                </div>
+            </div>
+
+            <div class="camera-controls">
+                <button class="btn-record auth-record" id="authRecordBtn" onclick="startAuthentication()">
+                    <span class="record-circle"></span>
+                    <span>Authenticate (3 seconds)</span>
+                </button>
+            </div>
+            <div class="progress-bar" id="authProgress" style="display:none">
+                <div class="progress-fill" id="authProgressFill"></div>
+            </div>
+            <div id="authStatus" class="status-message"></div>
+
+            <!-- Demo Mode Toggle -->
+            <div class="demo-section">
+                <div class="demo-badge">DEMO MODE</div>
+                <p>🧪 <strong>Spoof Test:</strong> Try pointing your camera at a <em>photo</em> of your object on a
+                    phone screen. It should <strong>FAIL</strong> because ScanPass detects static images via optical
+                    flow analysis.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== VIEW: RESULT ===== -->
+    <section id="view-result" class="view">
+        <div class="card glass wide-card">
+            <div class="result-icon" id="resultIcon"></div>
+            <h2 id="resultTitle" class="result-title"></h2>
+            <p id="resultMessage" class="result-message"></p>
+
+            <!-- Detailed Log Panel -->
+            <div class="log-panel" id="logPanel">
+                <div class="log-header">Authentication Log</div>
+                <div id="logEntries" class="log-entries"></div>
+            </div>
+
+            <!-- Detail Cards -->
+            <div class="detail-grid" id="detailGrid"></div>
+
+            <div class="result-actions">
+                <button id="btnContinue" class="btn-primary" onclick="showView('view-dashboard')"
+                    style="display:none">Access Secure Session 🔓</button>
+                <button class="btn-primary" onclick="tryAgain()">Try Again</button>
+                <button class="btn-secondary" onclick="showView('view-auth')">Back to Auth</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== VIEW: DASHBOARD (SECURE SESSION) ===== -->
+    <section id="view-dashboard" class="view">
+        <div class="card glass wide-card dashboard-card">
+            <div class="card-header">
+                <div class="secure-badge">
+                    <span class="lock-icon">🔒</span>
+                    <span>SECURE SESSION ACTIVE</span>
+                </div>
+                <div class="session-timer" id="sessionTimer">Session expires in 120s</div>
+            </div>
+
+            <div class="session-info">
+                <div class="info-row">
+                    <span class="info-label">Session ID:</span>
+                    <span class="info-value" id="dashboardSessionId">SP-????</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bound To:</span>
+                    <span class="info-value">Chrome / Localhost (Verified)</span>
+                </div>
+            </div>
+
+            <div class="dashboard-actions">
+                <button class="btn-action" onclick="fetchSecureData()">
+                    <span class="action-icon">📂</span>
+                    <span>View Protected Data</span>
+                </button>
+
+                <button class="btn-action revoke" onclick="revokeKey()">
+                    <span class="action-icon">🚫</span>
+                    <span>Revoke Visual Key</span>
+                </button>
+            </div>
+
+            <div id="secureDataDisplay" class="secure-data-box" style="display:none"></div>
+
+            <div class="card-footer">
+                <p>ScanPass has verified your physical presence.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== TOAST ===== -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
