@@ -3,7 +3,14 @@
  * Camera capture, API integration, view routing
  */
 
-const API_BASE = "http://localhost:8000";
+// --- Configuration ---
+// Replace this with your actual Render Backend URL (without a trailing slash)
+const RENDER_URL = "https://scanpass-backend.onrender.com";
+
+const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8000"
+    : RENDER_URL;
+
 
 // --- State ---
 let authToken = null;
