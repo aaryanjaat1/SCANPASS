@@ -4,12 +4,19 @@
  */
 
 // --- Configuration ---
-// Replace this with your actual Render Backend URL (without a trailing slash)
+// ⚠️ ACTION REQUIRED: Replace the URL below with your ACTUAL Render Backend URL
+// You can find this on your Render Dashboard (e.g., https://your-app-name.onrender.com)
 const RENDER_URL = "https://scanpass-backend.onrender.com";
 
 const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? "http://localhost:8000"
     : RENDER_URL;
+
+console.log("🚀 ScanPass connecting to backend at:", API_BASE);
+
+if (API_BASE.includes("your-scanpass-backend")) {
+    console.warn("⚠️ Warning: You are using the placeholder Render URL. Update RENDER_URL in app.js");
+}
 
 
 // --- State ---
