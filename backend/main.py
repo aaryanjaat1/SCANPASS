@@ -32,7 +32,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -390,22 +390,22 @@ async def authenticate(
     auth_log = []
     
     try:
-        # Step 1: Extract frames
+        # Step 2: Extraction & Flow (Heavy lifting)
         frames = extract_frames(video_bytes, n_frames=10)
-        auth_log.append(f"✓ Extracted {len(frames)} frames from video")
-        logger.info(f"   Extracted {len(frames)} frames")
-        
-        # Step 2: Liveness check
-        liveness_result = check_liveness(frames, min_motion=LIVENESS_THRESHOLD)
+        from liveness import compute_optical_flow
+        flows = compute_optical_flow(frames)
+        auth_log.append(f"✓ Extracted {len(frames)} frames & computed flow")
+
+        # Step 3: Liveness check
+        liveness_result = check_liveness(frames, flows=flows, min_motion=LIVENESS_THRESHOLD)
         auth_log.append(
             f"{'✓' if liveness_result['is_live'] else '✗'} Liveness: "
             f"{liveness_result['reason']}"
         )
-        logger.info(f"   Liveness: {liveness_result}")
         
-        # Step 3: Challenge direction check
+        # Step 4: Challenge direction check
         direction_result = check_challenge_direction(
-            frames, challenge["expected_direction"]
+            frames, challenge["expected_direction"], flows=flows
         )
         auth_log.append(
             f"{'✓' if direction_result['direction_match'] else '✗'} Direction: "

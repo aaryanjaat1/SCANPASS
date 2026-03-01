@@ -15,6 +15,9 @@
 </head>
 
 <body>
+    <!-- CRT Overlay Effects -->
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
 
     <!-- ===== HEADER ===== -->
     <header class="app-header">
@@ -39,20 +42,8 @@
                     <input type="text" id="loginUsername" placeholder="Enter your username" required
                         autocomplete="username">
                 </div>
-                <div class="input-group">
-                    <label for="loginPassword">Password</label>
-                    <input type="password" id="loginPassword" placeholder="Enter your password" required
-                        autocomplete="current-password">
-                </div>
                 <button type="submit" class="btn-primary" id="loginBtn">
-                    <span>Sign In</span>
-                </button>
-                <div class="divider">
-                    <span>OR</span>
-                </div>
-                <button type="button" class="btn-secondary visual-login-btn" onclick="handleVisualLoginClick()">
-                    <span class="icon">👁️</span>
-                    <span>Login with Visual Key</span>
+                    <span>Sign In with Visual Key</span>
                 </button>
             </form>
             <div class="card-footer">
@@ -65,8 +56,13 @@
     <section id="view-register" class="view">
         <div class="card glass">
             <div class="card-header">
-                <h2>Create Account</h2>
-                <p>Set up your ScanPass credentials</p>
+                <div class="header-with-back">
+                    <button class="btn-back-icon" onclick="showView('view-login')" title="Back to Login">←</button>
+                    <div>
+                        <h2>Create Account</h2>
+                        <p>Set up your ScanPass credentials</p>
+                    </div>
+                </div>
             </div>
             <form id="registerForm" onsubmit="handleRegister(event)">
                 <div class="input-group">
@@ -74,20 +70,8 @@
                     <input type="text" id="regUsername" placeholder="Choose a username (3+ chars)" required
                         minlength="3" autocomplete="username">
                 </div>
-                <div class="input-group">
-                    <label for="regPassword">Password</label>
-                    <input type="password" id="regPassword" placeholder="Choose a password (4+ chars)" required
-                        minlength="4" autocomplete="new-password">
-                </div>
                 <button type="submit" class="btn-primary" id="registerBtn">
-                    <span>Create Account</span>
-                </button>
-                <div class="divider">
-                    <span>OR</span>
-                </div>
-                <button type="button" class="btn-secondary visual-login-btn" onclick="handleVisualRegisterClick()">
-                    <span class="icon">👁️</span>
-                    <span>Register with Visual Key</span>
+                    <span>Register Visual Key</span>
                 </button>
             </form>
             <div class="card-footer">
@@ -108,6 +92,7 @@
                 <div class="camera-overlay" id="enrollOverlay">
                     <div class="scan-ring"></div>
                     <span>Position your object in view</span>
+                    <button class="btn-switch-camera" onclick="switchCamera('enrollVideo')">🔄 Switch Camera</button>
                 </div>
                 <div class="recording-indicator" id="enrollRecordingIndicator" style="display:none">
                     <span class="rec-dot"></span> Recording...
@@ -118,6 +103,7 @@
                     <span class="record-circle"></span>
                     <span>Record Object (3 seconds)</span>
                 </button>
+                <button class="btn-secondary btn-cancel" onclick="showView('view-register')">Cancel</button>
             </div>
             <div class="progress-bar" id="enrollProgress" style="display:none">
                 <div class="progress-fill" id="enrollProgressFill"></div>
@@ -146,6 +132,7 @@
                 <div class="camera-overlay" id="authOverlay">
                     <div class="scan-ring auth-ring"></div>
                     <span>Hold your object and follow the challenge</span>
+                    <button class="btn-switch-camera" onclick="switchCamera('authVideo')">🔄 Switch Camera</button>
                 </div>
                 <div class="recording-indicator" id="authRecordingIndicator" style="display:none">
                     <span class="rec-dot"></span> Recording...
@@ -157,6 +144,7 @@
                     <span class="record-circle"></span>
                     <span>Authenticate (3 seconds)</span>
                 </button>
+                <button class="btn-secondary btn-cancel" onclick="showView('view-login')">Cancel</button>
             </div>
             <div class="progress-bar" id="authProgress" style="display:none">
                 <div class="progress-fill" id="authProgressFill"></div>
@@ -200,43 +188,122 @@
 
     <!-- ===== VIEW: DASHBOARD (SECURE SESSION) ===== -->
     <section id="view-dashboard" class="view">
-        <div class="card glass wide-card dashboard-card">
-            <div class="card-header">
-                <div class="secure-badge">
-                    <span class="lock-icon">🔒</span>
-                    <span>SECURE SESSION ACTIVE</span>
+        <div class="cyber-grid dashboard-layout">
+
+            <!-- LEFT: Cyber Profile Card -->
+            <div class="cyber-card profile-card glass">
+                <div class="profile-header">
+                    <div class="profile-avatar-container">
+                        <img src="hacking_avatar.png" alt="Avatar" class="profile-avatar">
+                        <div class="avatar-glow"></div>
+                        <div class="avatar-scan-ring"></div>
+                    </div>
+                    <div class="profile-name-box">
+                        <h3 class="profile-name">Authenticating...</h3>
+                        <p class="profile-id">NODE_ID: SP-0XVR772</p>
+                    </div>
                 </div>
-                <div class="session-timer" id="sessionTimer">Session expires in 120s</div>
-            </div>
-
-            <div class="session-info">
-                <div class="info-row">
-                    <span class="info-label">Session ID:</span>
-                    <span class="info-value" id="dashboardSessionId">SP-????</span>
+                <div class="profile-details">
+                    <div class="detail-item">
+                        <span class="label">STATUS</span>
+                        <span class="value verified">VERIFIED</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">LEVEL</span>
+                        <span class="value">ADMIN</span>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Bound To:</span>
-                    <span class="info-value">Chrome / Localhost (Verified)</span>
+                <div class="qr-container">
+                    <div class="qr-code">
+                        <!-- Simulated QR with CSS grid -->
+                        <div class="qr-mock"></div>
+                    </div>
+                    <p class="qr-label">SECURE_TOKEN_GEN</p>
+                </div>
+                <div class="cyber-decor-lines">
+                    <span></span><span></span><span></span>
                 </div>
             </div>
 
-            <div class="dashboard-actions">
-                <button class="btn-action" onclick="fetchSecureData()">
-                    <span class="action-icon">📂</span>
-                    <span>View Protected Data</span>
-                </button>
+            <!-- CENTER: Main Session Control -->
+            <div class="cyber-card main-session glass">
+                <div class="card-header">
+                    <div class="secure-badge">
+                        <span class="lock-icon">🔒</span>
+                        <span>SECURE SESSION ACTIVE</span>
+                    </div>
+                    <div class="session-timer" id="sessionTimer">Session expires in 120s</div>
+                </div>
 
-                <button class="btn-action revoke" onclick="revokeKey()">
-                    <span class="action-icon">🚫</span>
-                    <span>Revoke Visual Key</span>
-                </button>
+                <div class="session-info-grid">
+                    <div class="info-block">
+                        <span class="info-label">SESSION_ID</span>
+                        <span class="info-value terminal-green" id="dashboardSessionId">SP-INITIALIZING</span>
+                    </div>
+                    <div class="info-block">
+                        <span class="info-label">ENCRYPTION</span>
+                        <span class="info-value terminal-green">AES-256-GCM_TUNNEL</span>
+                    </div>
+                    <div class="info-block">
+                        <span class="info-label">NODE_STATUS</span>
+                        <span class="info-value terminal-green">LINK_STABLE</span>
+                    </div>
+                </div>
+
+                <div class="dashboard-actions-grid">
+                    <button class="cyber-btn" onclick="fetchSecureData()">
+                        <span class="action-icon">📂</span>
+                        <span>TERMINAL_DATA</span>
+                    </button>
+                    <button class="cyber-btn cyber-btn-alt" onclick="revokeKey()">
+                        <span class="action-icon">🚫</span>
+                        <span>REVOKE_KEY</span>
+                    </button>
+                    <button id="logoutBtnDash" class="cyber-btn" onclick="logout()">
+                        <span class="action-icon">⚠️</span>
+                        <span>TERMINATE</span>
+                    </button>
+                </div>
+
+                <div id="secureDataDisplay" class="secure-data-box" style="display:none"></div>
             </div>
 
-            <div id="secureDataDisplay" class="secure-data-box" style="display:none"></div>
-
-            <div class="card-footer">
-                <p>ScanPass has verified your physical presence.</p>
+            <!-- RIGHT: Hacking Graphs -->
+            <div class="cyber-card side-graphs glass">
+                <div class="graph-header">SYSTEM_MONITOR</div>
+                <div class="graph-label">PROCESS_LOAD</div>
+                <div class="hacking-graph bars" id="barsLoad">
+                    <div class="bar-container">
+                        <div class="bar-fill" style="--h: 60%; --d: 0s"></div>
+                        <div class="bar-fill" style="--h: 80%; --d: 0.2s"></div>
+                        <div class="bar-fill" style="--h: 40%; --d: 0.4s"></div>
+                        <div class="bar-fill" style="--h: 90%; --d: 0.6s"></div>
+                        <div class="bar-fill" style="--h: 70%; --d: 0.8s"></div>
+                        <div class="bar-fill" style="--h: 50%; --d: 1s"></div>
+                    </div>
+                </div>
+                <div class="graph-label">NETWORK_WAVE</div>
+                <div class="hacking-graph wave">
+                    <svg viewBox="0 0 100 40" class="wave-svg">
+                        <path class="wave-path" d="M0,20 Q10,5 20,20 T40,20 T60,20 T80,20 T100,20" />
+                    </svg>
+                </div>
+                <div class="graph-label">MEMORY_MAP</div>
+                <div class="hacking-graph hex-stream" id="hexStream">
+                    <!-- Dynamic hex lines injected here -->
+                </div>
             </div>
+
+            <!-- BOTTOM: Scrolling Data Trace -->
+            <div class="cyber-card bottom-trace glass">
+                <div class="trace-container">
+                    <div class="trace-text" id="traceLog">
+                        [SYS] Visual encryption active... [AUTH] Identity verified... [NET] Socket tunneling enabled...
+                        [SEC] Heartbeat 200 OK... [SYS] Buffer cleared...
+                    </div>
+                </div>
+            </div>
+
         </div>
     </section>
 

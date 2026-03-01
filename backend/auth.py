@@ -24,12 +24,16 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
+    
     try:
         salt, stored_hash = hashed_password.split("$", 1)
         computed = hashlib.sha256((salt + plain_password).encode()).hexdigest()
         return computed == stored_hash
     except (ValueError, AttributeError):
         return False
+        return False 
+
+    
 
 
 # --- JWT Tokens ---

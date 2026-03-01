@@ -8,15 +8,30 @@
 // You can find this on your Render Dashboard (e.g., https://your-app-name.onrender.com)
 const RENDER_URL = "https://scanpass-backend.onrender.com";
 
-const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ? "http://localhost:8000"
-    : RENDER_URL;
+// Auto-detect backend
+const API_BASE = (window.location.hostname.includes("onrender.com"))
+    ? RENDER_URL
+    : (window.location.hostname === "localhost" || window.location.hostname === "[::1]")
+        ? "http://127.0.0.1:8000" // Use explicit IPv4 loopback for stability
+        : `http://${window.location.hostname}:8000`;
 
 console.log("🚀 ScanPass connecting to backend at:", API_BASE);
 
-if (API_BASE.includes("your-scanpass-backend")) {
-    console.warn("⚠️ Warning: You are using the placeholder Render URL. Update RENDER_URL in app.js");
+// --- DOM Sanity Check ---
+function checkDOM() {
+    const required = [
+        "regUsername", "loginUsername", "loginBtn", "registerBtn",
+        "view-login", "view-register", "view-enroll", "view-auth",
+        "challengeText", "challengeHint", "toast"
+    ];
+    const missing = required.filter(id => !document.getElementById(id));
+    if (missing.length > 0) {
+        console.error("❌ CRITICAL: Missing DOM elements:", missing);
+    } else {
+        console.log("✅ DOM elements verified.");
+    }
 }
+window.addEventListener("DOMContentLoaded", checkDOM);
 
 
 // --- State ---
@@ -27,6 +42,7 @@ let mediaStream = null;
 let sessionTimerInterval;
 let isVisualLogin = false;
 let isVisualRegistration = false;
+let currentFacingMode = "user"; // "user" or "environment"
 
 // =====================
 // VIEW ROUTING
@@ -63,17 +79,25 @@ async function startCamera(videoElementId) {
     stopCamera();
     try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+            video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
             audio: false
         });
         const videoEl = document.getElementById(videoElementId);
         if (videoEl) {
             videoEl.srcObject = mediaStream;
+            // Mirror only for front camera
+            videoEl.style.transform = currentFacingMode === "user" ? "scaleX(-1)" : "scaleX(1)";
         }
     } catch (err) {
         console.error("Camera access failed:", err);
         showToast("Camera access denied. Please allow camera access.", "error");
     }
+}
+
+async function switchCamera(videoElementId) {
+    currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+    showToast(`Switching to ${currentFacingMode === "user" ? "front" : "back"} camera...`, "info");
+    await startCamera(videoElementId);
 }
 
 function stopCamera() {
@@ -149,71 +173,62 @@ function recordVideo(durationMs = 3000, progressBarId = null, progressFillId = n
 // =====================
 async function handleRegister(event) {
     event.preventDefault();
-    const username = document.getElementById("regUsername").value.trim();
-    const password = document.getElementById("regPassword").value;
-    const btn = document.getElementById("registerBtn");
-
-    btn.disabled = true;
-    btn.innerHTML = "<span>Creating account...</span>";
+    console.log("📝 handleRegister triggered");
 
     try {
-        const res = await fetch(`${API_BASE}/api/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
+        const usernameInput = document.getElementById("regUsername");
+        if (!usernameInput) {
+            throw new Error("Critical Error: 'regUsername' element not found in DOM.");
+        }
 
-        if (!res.ok) throw new Error(data.detail || "Registration failed");
+        const username = usernameInput.value.trim();
+        if (!username || username.length < 3) {
+            showToast("Please enter a username (3+ chars)", "error");
+            return;
+        }
 
-        authToken = data.token;
+        isVisualRegistration = true;
         currentUser = username;
-        showToast("Account created! Now enroll your visual key.", "success");
+
+        // Customize enroll view for registration
+        const header = document.querySelector("#view-enroll .card-header h2");
+        if (header) header.textContent = "🔑 Create Visual Key";
+
         showView("view-enroll");
+        showToast("Record your object to create your account.", "info");
     } catch (err) {
+        console.error("Registration UI Error:", err);
         showToast(err.message, "error");
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = "<span>Create Account</span>";
     }
 }
 
-async function handleVisualRegisterClick() {
-    const username = document.getElementById("regUsername").value.trim();
-    if (!username || username.length < 3) {
-        showToast("Please enter a username (3+ chars)", "error");
-        return;
-    }
 
-    if (!confirm(`Register '${username}' with Visual Key only? (No password will be set)`)) {
-        return;
-    }
-
-    isVisualRegistration = true;
-    currentUser = username; // Temporarily set for enrollment
-
-    // Customize enroll view for registration
-    const header = document.querySelector("#view-enroll .card-header h2");
-    if (header) header.textContent = "🔑 Create Visual Key";
-
-    showView("view-enroll");
-    showToast("Record your object to create your account.", "info");
-}
-
-
-async function handleVisualLoginClick() {
-    const username = document.getElementById("loginUsername").value.trim();
-    if (!username) {
-        showToast("Please enter your username first", "error");
-        return;
-    }
-
-    const btn = document.querySelector(".visual-login-btn");
-    btn.disabled = true;
-    btn.innerHTML = `<span class="icon">⏳</span><span>Checking...</span>`;
+async function handleLogin(event) {
+    event.preventDefault();
+    console.log("🔑 handleLogin triggered");
 
     try {
-        const res = await fetch(`${API_BASE}/api/login/challenge`, {
+        const usernameInput = document.getElementById("loginUsername");
+        if (!usernameInput) {
+            throw new Error("Critical Error: 'loginUsername' element not found in DOM.");
+        }
+
+        const username = usernameInput.value.trim();
+        if (!username) {
+            showToast("Please enter your username first", "error");
+            return;
+        }
+
+        const btn = document.getElementById("loginBtn");
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = "<span>Checking visual key...</span>";
+        }
+
+        const url = `${API_BASE}/api/login/challenge`;
+        console.log(`🌐 Fetching login challenge from: ${url}`);
+
+        const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username })
@@ -228,57 +243,23 @@ async function handleVisualLoginClick() {
         currentChallenge = data.challenge;
 
         // Setup auth view
-        document.getElementById("challengeText").textContent = currentChallenge.text;
-        document.getElementById("challengeHint").textContent = currentChallenge.description;
+        const ct = document.getElementById("challengeText");
+        const ch = document.getElementById("challengeHint");
+        if (ct) ct.textContent = currentChallenge.text;
+        if (ch) ch.textContent = currentChallenge.description;
 
         showView("view-auth");
         showToast("Visual key found! Please authenticate.", "success");
 
     } catch (err) {
+        console.error("Login UI Error:", err);
         showToast(err.message, "error");
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<span class="icon">👁️</span><span>Login with Visual Key</span>`;
-    }
-}
-
-
-async function handleLogin(event) {
-    event.preventDefault();
-    isVisualLogin = false; // Reset visual login flag
-    isVisualRegistration = false; // Reset visual reg flag
-    const username = document.getElementById("loginUsername").value.trim();
-    const password = document.getElementById("loginPassword").value;
-    const btn = document.getElementById("loginBtn");
-
-    btn.disabled = true;
-    btn.innerHTML = "<span>Signing in...</span>";
-
-    try {
-        const res = await fetch(`${API_BASE}/api/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data.detail || "Login failed");
-
-        authToken = data.token;
-        currentUser = username;
-
-        if (data.has_object) {
-            showToast("Password verified! Complete visual authentication.", "success");
-            showView("view-auth");
-        } else {
-            showToast("Password verified! Enroll your visual key first.", "success");
-            showView("view-enroll");
+        const btn = document.getElementById("loginBtn");
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = "<span>Sign In with Visual Key</span>";
         }
-    } catch (err) {
-        showToast(err.message, "error");
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = "<span>Sign In</span>";
     }
 }
 
@@ -296,7 +277,9 @@ function logout() {
 // =====================
 async function fetchChallenge() {
     try {
-        const res = await fetch(`${API_BASE}/api/challenge`, {
+        const url = `${API_BASE}/api/challenge`;
+        console.log(`🌐 Fetching random challenge from: ${url}`);
+        const res = await fetch(url, {
             headers: { "Authorization": `Bearer ${authToken}` }
         });
         const data = await res.json();
@@ -340,13 +323,17 @@ async function startEnrollment() {
             if (isVisualRegistration) {
                 // VISUAL REGISTRATION
                 formData.append("username", currentUser);
-                return fetch(`${API_BASE}/api/register/visual`, {
+                const url = `${API_BASE}/api/register/visual`;
+                console.log(`🌐 Uploading enrollment to: ${url}`);
+                return fetch(url, {
                     method: "POST",
                     body: formData
                 });
             } else {
                 // NORMAL ENROLLMENT (authenticated)
-                return fetch(`${API_BASE}/api/enroll-object`, {
+                const url = `${API_BASE}/api/enroll-object`;
+                console.log(`🌐 Uploading enrollment to: ${url}`);
+                return fetch(url, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${authToken}` },
                     body: formData
@@ -371,9 +358,14 @@ async function startEnrollment() {
         }
 
     } catch (err) {
-        status.textContent = `❌ ${err.message}`;
+        console.error("Enrollment error:", err);
+        let errorMsg = err.message;
+        if (err instanceof TypeError && err.message === "Failed to fetch") {
+            errorMsg = `Network Error: Cannot connect to ${API_BASE}. Ensure backend is running.`;
+        }
+        status.textContent = `❌ ${errorMsg}`;
         status.className = "status-message error";
-        showToast("Enrollment failed: " + err.message, "error");
+        showToast(errorMsg, "error");
     } finally {
         btn.disabled = false;
         indicator.style.display = "none";
@@ -418,7 +410,10 @@ async function startAuthentication() {
             // --- VISUAL LOGIN FLOW ---
             formData.append("username", currentUser);
 
-            const res = await fetch(`${API_BASE}/api/login/visual`, {
+            const url = `${API_BASE}/api/login/visual`;
+            console.log(`🌐 Submitting visual login to: ${url}`);
+
+            const res = await fetch(url, {
                 method: "POST",
                 body: formData
             });
@@ -437,7 +432,10 @@ async function startAuthentication() {
 
         } else {
             // --- NORMAL SECONDARY AUTH FLOW ---
-            const res = await fetch(`${API_BASE}/api/authenticate`, {
+            const url = `${API_BASE}/api/authenticate`;
+            console.log(`🌐 Submitting authentication to: ${url}`);
+
+            const res = await fetch(url, {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${authToken}` },
                 body: formData
@@ -451,9 +449,14 @@ async function startAuthentication() {
         }
 
     } catch (err) {
-        status.textContent = `❌ ${err.message}`;
+        console.error("Auth error:", err);
+        let errorMsg = err.message;
+        if (err instanceof TypeError && err.message === "Failed to fetch") {
+            errorMsg = `Network Error: Backend unreachable (${API_BASE}). Check server status.`;
+        }
+        status.textContent = `❌ ${errorMsg}`;
         status.className = "status-message error";
-        showToast("Authentication error: " + err.message, "error");
+        showToast(errorMsg, "error");
     } finally {
         btn.disabled = false;
         indicator.style.display = "none";
@@ -549,6 +552,12 @@ function updateDashboard(sessionId) {
     const sessionEl = document.getElementById("dashboardSessionId");
     if (sessionEl) sessionEl.textContent = sessionId;
 
+    // Update Profile Name if available
+    const nameEl = document.querySelector(".profile-name");
+    if (nameEl && currentUser) {
+        nameEl.textContent = currentUser;
+    }
+
     // Reset secure data
     const dataDisplay = document.getElementById("secureDataDisplay");
     if (dataDisplay) {
@@ -557,6 +566,76 @@ function updateDashboard(sessionId) {
     }
 
     startSessionTimer();
+    startTraceLog();
+    startLiveGraphs();
+    startHexStream();
+}
+
+/**
+ * Real-time bar graph jitter
+ */
+function startLiveGraphs() {
+    const bars = document.querySelectorAll("#barsLoad .bar-fill");
+    if (!bars.length) return;
+
+    setInterval(() => {
+        bars.forEach(bar => {
+            const randomH = Math.floor(Math.random() * 60) + 30; // 30% to 90%
+            bar.style.setProperty("--h", randomH + "%");
+        });
+    }, 1500);
+}
+
+/**
+ * Scrolling Hex/Packet Stream
+ */
+function startHexStream() {
+    const stream = document.getElementById("hexStream");
+    if (!stream) return;
+
+    const generateHex = () => {
+        const addr = "0x" + Math.random().toString(16).substr(2, 6).toUpperCase();
+        const data = Array.from({ length: 8 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase()).join(" ");
+        return `<div class="hex-line"><span class="hex-head">${addr}</span><span class="hex-data">${data}</span></div>`;
+    };
+
+    // Initial fill
+    stream.innerHTML = Array.from({ length: 10 }, generateHex).join("");
+
+    setInterval(() => {
+        const newLine = generateHex();
+        stream.innerHTML += newLine;
+        if (stream.children.length > 12) {
+            stream.removeChild(stream.firstChild);
+        }
+    }, 800);
+}
+
+function startTraceLog() {
+    const traceEl = document.getElementById("traceLog");
+    if (!traceEl) return;
+
+    const baseMessages = [
+        "[SYS] Visual encryption active...",
+        "[AUTH] Identity verified...",
+        "[NET] Socket tunneling enabled...",
+        "[SEC] Heartbeat 200 OK...",
+        "[SYS] Buffer cleared...",
+        "[DEB] Optical flow synchronized...",
+        "[MEM] Allocation stable...",
+        "[SYS] SCANPASS Engine v2.0 running..."
+    ];
+
+    setInterval(() => {
+        const randomMsg = baseMessages[Math.floor(Math.random() * baseMessages.length)];
+        const timestamp = new Date().toLocaleTimeString();
+        traceEl.textContent = `${traceEl.textContent} [${timestamp}] ${randomMsg} `;
+
+        // Keep it from getting too long
+        if (traceEl.textContent.length > 1000) {
+            traceEl.textContent = traceEl.textContent.substring(500);
+        }
+    }, 5000);
 }
 
 function startSessionTimer() {

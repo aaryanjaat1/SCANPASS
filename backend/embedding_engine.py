@@ -107,13 +107,28 @@ def frame_to_embedding(frame: np.ndarray) -> np.ndarray:
 
 def get_average_embedding(frames: list[np.ndarray]) -> np.ndarray:
     """
-    Compute the average embedding across all frames.
-    This creates a robust representation of the object.
+    Compute the average embedding across all frames using batch inference.
     """
-    embeddings = [frame_to_embedding(f) for f in frames]
-    avg = np.mean(embeddings, axis=0)
-    # L2 normalize for stable cosine similarity
+    if not frames:
+        return np.zeros(1280)
+    
+    # 1. Preprocess all frames into a batch
+    tensors = []
+    for frame in frames:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(rgb)
+        tensors.append(_transform(pil_image))
+    
+    batch_tensor = torch.stack(tensors)  # Shape: (N, 3, 224, 224)
+    
+    # 2. Batch Inference
+    with torch.no_grad():
+        batch_embeddings = _model(batch_tensor)  # Shape: (N, 1280)
+    
+    # 3. Average and Normalize
+    avg = torch.mean(batch_embeddings, dim=0).numpy()
     avg = avg / (np.linalg.norm(avg) + 1e-8)
+    
     return avg
 
 

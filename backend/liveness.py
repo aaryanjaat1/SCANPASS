@@ -103,69 +103,57 @@ def detect_dominant_direction(flows: list[np.ndarray]) -> dict:
     }
 
 
-def check_liveness(frames: list[np.ndarray], min_motion: float = 1.5) -> dict:
+def check_liveness(frames: list[np.ndarray], flows: list[np.ndarray] = None, min_motion: float = 1.5) -> dict:
     """
-    Check if the video contains real motion (not a static photo/screenshot).
-    
-    Args:
-        frames: List of BGR frames from the video
-        min_motion: Minimum average optical flow magnitude to consider as "live"
-    
-    Returns:
-        dict with: is_live, motion_score, reason
+    Check if the video contains real motion.
     """
     if len(frames) < 2:
         return {
             "is_live": False,
             "motion_score": 0.0,
-            "reason": "Insufficient frames for motion analysis"
+            "reason": "Insufficient frames"
         }
     
-    flows = compute_optical_flow(frames)
+    if flows is None:
+        flows = compute_optical_flow(frames)
+        
     motion_stats = compute_motion_magnitude(flows)
-    
     avg_mag = motion_stats["avg_magnitude"]
     
     if avg_mag < min_motion:
         return {
             "is_live": False,
             "motion_score": round(avg_mag, 3),
-            "reason": f"Static/replay detected — motion score {avg_mag:.3f} below threshold {min_motion}. "
-                      f"A real moving object should produce higher optical flow values."
+            "reason": f"Static image detected (Score: {avg_mag:.2f})"
         }
     
     return {
         "is_live": True,
         "motion_score": round(avg_mag, 3),
-        "reason": f"Live motion detected — motion score {avg_mag:.3f} exceeds threshold {min_motion}"
+        "reason": f"Live motion detected ({avg_mag:.2f})"
     }
 
 
 def check_challenge_direction(
     frames: list[np.ndarray], 
     expected_direction: str,
+    flows: list[np.ndarray] = None,
     direction_threshold: float = 0.3
 ) -> dict:
     """
-    Verify that the detected motion matches the challenge direction.
-    
-    Args:
-        frames: List of BGR frames
-        expected_direction: One of 'rotation', 'zoom_in', 'zoom_out', 'left', 'right'
-        direction_threshold: Minimum magnitude for directional match
-    
-    Returns:
-        dict with: direction_match, detected_direction, confidence, reason
+    Verify that motion matches challenge direction.
     """
     if len(frames) < 2:
         return {
             "direction_match": False,
             "detected_direction": "unknown",
             "confidence": 0.0,
-            "reason": "Insufficient frames for direction analysis"
+            "reason": "Insufficient frames"
         }
     
-    flows = compute_optical_flow(frames)
+    if flows is None:
+        flows = compute_optical_flow(frames)
+        
     direction_info = detect_dominant_direction(flows)
     
     # Determine which direction was actually detected
