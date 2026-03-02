@@ -6,14 +6,11 @@
 // --- Configuration ---
 // ⚠️ ACTION REQUIRED: Replace the URL below with your ACTUAL Render Backend URL
 // You can find this on your Render Dashboard (e.g., https://your-app-name.onrender.com)
-const RENDER_URL = "https://scanpass-backend.onrender.com";
+const RENDER_URL = "https://scanpass.onrender.com/";
 
-// Auto-detect backend
-const API_BASE = (window.location.hostname.includes("onrender.com"))
-    ? RENDER_URL
-    : (window.location.hostname === "localhost" || window.location.hostname === "[::1]")
-        ? "http://127.0.0.1:8000" // Use explicit IPv4 loopback for stability
-        : `http://${window.location.hostname}:8000`;
+const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "[::1]")
+    ? "http://127.0.0.1:8000" // Use local backend during local development
+    : RENDER_URL;             // Use production backend when deployed (e.g., Netlify)
 
 console.log("🚀 ScanPass connecting to backend at:", API_BASE);
 
