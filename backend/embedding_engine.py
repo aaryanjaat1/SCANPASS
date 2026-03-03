@@ -12,22 +12,54 @@ import torchvision.transforms as transforms
 from torchvision import models
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
 
-# --- Model Setup ---
-# Load MobileNetV2 pretrained, remove classifier head to get 1280-dim features
-_model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
-_model.classifier = torch.nn.Identity()  # Remove classification head
-_model.eval()
+logger = logging.getLogger("scanpass.embedding")
 
-# Standard ImageNet preprocessing
-_transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
-])
+# --- Lazy Singleton Model ---
+# Model is NOT loaded at import time. It is loaded once on first use.
+# This prevents the heavy download from crashing the server on Render's
+# resource-constrained cold starts.
+
+_model = None
+_transform = None
+
+
+def _get_model():
+    """Load MobileNetV2 once and cache it. Thread-safe for single-worker deployments."""
+    global _model, _transform
+
+    if _model is not None:
+        return _model, _transform
+
+    import os
+    # Point torch hub cache to a persistent path on Render's disk
+    cache_dir = os.environ.get("TORCH_HOME", "/opt/render/.cache/torch")
+    os.makedirs(cache_dir, exist_ok=True)
+    torch.hub.set_dir(cache_dir)
+
+    logger.info("🤖 Loading MobileNetV2 model (first use)...")
+    try:
+        _model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+        _model.classifier = torch.nn.Identity()  # Remove classification head → 1280-dim features
+        _model.eval()
+
+        _transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+        logger.info("✅ MobileNetV2 loaded successfully.")
+    except Exception as e:
+        logger.error(f"❌ Failed to load MobileNetV2: {e}")
+        raise RuntimeError(f"Model load failed: {e}")
+
+    return _model, _transform
+
+
 
 
 def extract_frames(video_bytes: bytes, n_frames: int = 10) -> list[np.ndarray]:
@@ -92,15 +124,16 @@ def frame_to_embedding(frame: np.ndarray) -> np.ndarray:
     """
     Convert a single BGR frame to a 1280-dim embedding vector.
     """
+    model, transform = _get_model()
     # Convert BGR (OpenCV) to RGB (PIL)
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     pil_image = Image.fromarray(rgb)
     
     # Preprocess and run through model
-    tensor = _transform(pil_image).unsqueeze(0)  # Add batch dim
+    tensor = transform(pil_image).unsqueeze(0)  # Add batch dim
     
     with torch.no_grad():
-        embedding = _model(tensor)
+        embedding = model(tensor)
     
     return embedding.squeeze().numpy()  # 1280-dim vector
 
@@ -112,18 +145,20 @@ def get_average_embedding(frames: list[np.ndarray]) -> np.ndarray:
     if not frames:
         return np.zeros(1280)
     
+    model, transform = _get_model()
+    
     # 1. Preprocess all frames into a batch
     tensors = []
     for frame in frames:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb)
-        tensors.append(_transform(pil_image))
+        tensors.append(transform(pil_image))
     
     batch_tensor = torch.stack(tensors)  # Shape: (N, 3, 224, 224)
     
     # 2. Batch Inference
     with torch.no_grad():
-        batch_embeddings = _model(batch_tensor)  # Shape: (N, 1280)
+        batch_embeddings = model(batch_tensor)  # Shape: (N, 1280)
     
     # 3. Average and Normalize
     avg = torch.mean(batch_embeddings, dim=0).numpy()

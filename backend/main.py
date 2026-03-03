@@ -22,11 +22,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("scanpass")
 
+# --- App Startup ---
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Warm up the ML model during startup so it is ready before the first request.
+    This prevents the model download from happening mid-request (which crashes Render).
+    """
+    logger.info("🚀 ScanPass API starting up — loading ML model...")
+    try:
+        from embedding_engine import _get_model
+        _get_model()  # Load once; result is cached in the module singleton
+        logger.info("✅ ML model warm-up complete. Server is ready.")
+    except Exception as e:
+        logger.error(f"❌ Model warm-up failed: {e}. Server will still start, but inference will retry on first request.")
+    yield
+    # Shutdown
+    logger.info("🛑 ScanPass API shutting down.")
+
 # --- App Setup ---
 app = FastAPI(
     title="ScanPass API",
     description="Dynamic visual-based secondary authentication",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
