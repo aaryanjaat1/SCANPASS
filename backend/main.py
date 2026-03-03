@@ -48,9 +48,8 @@ MIME_TO_EXT = {
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure uploads directory exists
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info(f"✅ Upload directory ready: {UPLOAD_DIR.resolve()}")
+    logger.info(f"✅ Upload directory: {UPLOAD_DIR.resolve()}")
+    logger.info("🚀 ScanPass API ready.")
     yield
     logger.info("🛑 ScanPass API shutting down.")
 
@@ -75,6 +74,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create uploads folder at import time so StaticFiles doesn't crash on startup
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Serve uploaded images as static files at /uploads/<filename>
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
